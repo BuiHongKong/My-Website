@@ -67,13 +67,14 @@ Source/Staging Repo (hiện tại)
 2. **Settings** → **Secrets and variables** → **Actions**
 3. Click **"New repository secret"**
 
-### Secret 1: PRODUCTION_REPO_TOKEN
-- Name: `PRODUCTION_REPO_TOKEN`
+### Secret 1: PRODUCTION_REPO_TOKEN (BẮT BUỘC)
+- Name: `PRODUCTION_REPO_TOKEN` (chính xác, viết hoa)
 - Value: Paste token vừa tạo
 - Click **"Add secret"**
+- **⚠️ QUAN TRỌNG:** Secret này là BẮT BUỘC. Workflow sẽ fail nếu thiếu token này.
 
 ### Secret 2: PRODUCTION_REPO (Optional)
-- Name: `PRODUCTION_REPO`
+- Name: `PRODUCTION_REPO` (chính xác, viết hoa)
 - Value: `[username]/[repo-production]` (ví dụ: `john-doe/my-website-production`)
 - Click **"Add secret"**
 - **Lưu ý:** Nếu không thêm, workflow tự động dùng `[repo-name]-production`
@@ -161,34 +162,42 @@ Sau khi setup xong, bạn sẽ có 2 repositories:
 ### 2. Production không deploy được?
 
 **Kiểm tra:**
-- Secret `PRODUCTION_REPO_TOKEN` đã thêm chưa?
+- **Secret `PRODUCTION_REPO_TOKEN` đã thêm chưa?** (BẮT BUỘC)
 - Token có quyền `repo` chưa?
 - Repo-production đã enable GitHub Pages chưa?
 - Xem logs của workflow để biết lỗi cụ thể
 
+**Lỗi thường gặp:**
+- `Action failed with "The generated GITHUB_TOKEN does not support to push to an external repository"` → Thiếu `PRODUCTION_REPO_TOKEN` secret
+- `Cannot access repository` → Token không có quyền hoặc repo không tồn tại
+
 ### 3. Token không hoạt động?
 
 **Giải pháp:**
-- Tạo token mới với đầy đủ quyền `repo`
+- Tạo token mới với đầy đủ quyền `repo` (full control)
 - Đảm bảo token chưa hết hạn
-- Kiểm tra secret name: `PRODUCTION_REPO_TOKEN` (chính xác)
+- Kiểm tra secret name: `PRODUCTION_REPO_TOKEN` (chính xác, viết hoa)
+- Token phải được thêm vào **Source Repository** (không phải production repo)
+- Workflow sẽ tự động check token ở step "Check Production Token" - nếu thiếu sẽ fail ngay
 
 ### 4. Repo-production không tìm thấy?
 
 **Giải pháp:**
-- Thêm secret `PRODUCTION_REPO` với format: `username/repo-production`
+- Thêm secret `PRODUCTION_REPO` với format: `username/repo-production` (ví dụ: `BuiHongKong/CI-CD-staging-production`)
 - Hoặc đảm bảo repo có tên đúng: `[repo-name]-production`
+- **Lưu ý:** Format phải chính xác: `username/repo-name` (có dấu `/`, không có khoảng trắng)
+- Username và repo-name phải đúng chữ hoa/chữ thường
 
 ---
 
 ## ✅ Checklist
 
 - [ ] Đã enable GitHub Pages cho repo hiện tại (Source: GitHub Actions)
-- [ ] Đã tạo repo-production
+- [ ] Đã tạo repo-production với tên: `[repo-name]-production`
 - [ ] Đã enable GitHub Pages cho repo-production (Deploy from branch: gh-pages)
-- [ ] Đã tạo Personal Access Token
-- [ ] Đã thêm secret `PRODUCTION_REPO_TOKEN` vào source repo
-- [ ] Đã thêm secret `PRODUCTION_REPO` (optional)
+- [ ] Đã tạo Personal Access Token với quyền `repo` (full control)
+- [ ] **Đã thêm secret `PRODUCTION_REPO_TOKEN` vào source repo** (BẮT BUỘC)
+- [ ] Đã thêm secret `PRODUCTION_REPO` (optional, nếu repo tên khác)
 - [ ] Đã test staging deploy (push code)
 - [ ] Đã test production deploy (manual)
 
