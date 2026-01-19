@@ -145,7 +145,7 @@ jobs:
     - name: Deploy to Production Repository
       uses: peaceiris/actions-gh-pages@v3
       with:
-        github_token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
+        personal_token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
         publish_dir: ./frontend
         external_repository: ${{ steps.set_production_repo.outputs.repo }}
         user_name: 'github-actions[bot]'
