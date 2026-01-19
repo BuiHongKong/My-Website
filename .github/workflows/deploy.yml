@@ -1,0 +1,191 @@
+name: Deploy to Environment
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy-staging:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Verify HTML file exists
+      run: |
+        if [ ! -f "frontend/index.html" ]; then
+          echo "❌ Error: frontend/index.html not found"
+          exit 1
+        fi
+        echo "✅ HTML file found: frontend/index.html"
+    
+    - name: Validate HTML
+      run: |
+        echo "🔍 Validating HTML..."
+        if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
+          echo "⚠️  Warning: Missing DOCTYPE declaration"
+        fi
+        if ! grep -q "<html" frontend/index.html; then
+          echo "❌ Error: Missing <html> tag"
+          exit 1
+        fi
+        if ! grep -q "</html>" frontend/index.html; then
+          echo "❌ Error: Missing closing </html> tag"
+          exit 1
+        fi
+        echo "✅ HTML validation passed"
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './frontend'
+    
+    - name: Deploy to GitHub Pages
+      uses: actions/deploy-pages@v4
+    
+    - name: Display Staging URL
+      run: |
+        echo "🌐 Staging deployed successfully!"
+        echo "🔗 URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Verify HTML file exists
+      run: |
+        if [ ! -f "frontend/index.html" ]; then
+          echo "❌ Error: frontend/index.html not found"
+          exit 1
+        fi
+        echo "✅ HTML file found: frontend/index.html"
+    
+    - name: Validate HTML
+      run: |
+        echo "🔍 Validating HTML..."
+        if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
+          echo "⚠️  Warning: Missing DOCTYPE declaration"
+        fi
+        if ! grep -q "<html" frontend/index.html; then
+          echo "❌ Error: Missing <html> tag"
+          exit 1
+        fi
+        if ! grep -q "</html>" frontend/index.html; then
+          echo "❌ Error: Missing closing </html> tag"
+          exit 1
+        fi
+        echo "✅ HTML validation passed"
+    
+    - name: Set Production Repo
+      id: set_production_repo
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_REPO }}" ]; then
+          PRODUCTION_REPO="${{ secrets.PRODUCTION_REPO }}"
+        else
+          PRODUCTION_REPO="${{ github.repository_owner }}/${{ github.event.repository.name }}-production"
+        fi
+        echo "repo=$PRODUCTION_REPO" >> $GITHUB_OUTPUT
+        echo "📦 Production repository: $PRODUCTION_REPO"
+    
+    - name: Check Production Token
+      run: |
+        if [ -z "${{ secrets.PRODUCTION_REPO_TOKEN }}" ]; then
+          echo "❌ Error: PRODUCTION_REPO_TOKEN secret is required!"
+          echo "⚠️  Please add PRODUCTION_REPO_TOKEN secret in:"
+          echo "   Settings → Secrets and variables → Actions → New repository secret"
+          echo "   Name: PRODUCTION_REPO_TOKEN"
+          echo "   Value: Your Personal Access Token with 'repo' permission"
+          exit 1
+        fi
+        echo "✅ Production token found"
+    
+    - name: Verify Token and Repository Access
+      run: |
+        PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
+        TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
+        
+        echo "🔍 Verifying access to repository: $PRODUCTION_REPO"
+        
+        # Test if we can access the repo
+        if curl -s -H "Authorization: token $TOKEN" \
+           -H "Accept: application/vnd.github.v3+json" \
+           "https://api.github.com/repos/$PRODUCTION_REPO" | grep -q '"name"'; then
+          echo "✅ Repository access verified"
+        else
+          echo "❌ Cannot access repository: $PRODUCTION_REPO"
+          echo "⚠️  Check:"
+          echo "   1. Repository exists: $PRODUCTION_REPO"
+          echo "   2. Token has 'repo' permission"
+          echo "   3. Token is not expired"
+          exit 1
+        fi
+    
+    - name: Deploy to Production Repository
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
+        publish_dir: ./frontend
+        external_repository: ${{ steps.set_production_repo.outputs.repo }}
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        force_orphan: false
+    
+    - name: Verify Deployment
+      run: |
+        PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
+        TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
+        
+        echo "🔍 Verifying deployment..."
+        sleep 2
+        
+        # Check if gh-pages branch exists
+        if curl -s -H "Authorization: token $TOKEN" \
+           -H "Accept: application/vnd.github.v3+json" \
+           "https://api.github.com/repos/$PRODUCTION_REPO/branches/gh-pages" | grep -q '"name"'; then
+          echo "✅ Branch gh-pages exists"
+          
+          # Get latest commit
+          COMMIT_SHA=$(curl -s -H "Authorization: token $TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$PRODUCTION_REPO/branches/gh-pages" | \
+            grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4)
+          
+          if [ -n "$COMMIT_SHA" ]; then
+            echo "✅ Latest commit: $COMMIT_SHA"
+          else
+            echo "⚠️  Could not get commit SHA"
+          fi
+        else
+          echo "❌ Branch gh-pages not found - deployment may have failed"
+          exit 1
+        fi
+    
+    - name: Display Production URL
+      run: |
+        PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
+        REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
+        USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
+        echo "🚀 Production deployed successfully!"
+        echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
