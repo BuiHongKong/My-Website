@@ -235,16 +235,33 @@ jobs:
         TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
         
         echo "📋 Getting previous deployment from Production repository..."
+        echo "🔍 Repository: $PRODUCTION_REPO"
+        echo "🔍 Branch: gh-pages"
         
-        # Get commits from gh-pages branch (get 2 commits: current and previous)
+        # Get commits from gh-pages branch (get 10 commits to be safe)
         COMMITS_JSON=$(curl -s -H "Authorization: token $TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=2")
+          "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=10")
         
-        # Check if we got any commits
+        # Debug: Check API response
+        echo "🔍 Debug: API Response length: ${#COMMITS_JSON}"
+        if [ ${#COMMITS_JSON} -lt 10 ]; then
+          echo "⚠️  API response seems empty or too short"
+          if echo "$COMMITS_JSON" | grep -q '"message"'; then
+            ERROR_MSG=$(echo "$COMMITS_JSON" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+            echo "❌ API Error: $ERROR_MSG"
+          fi
+        fi
+        
+        # Check if we got any commits - try multiple patterns
         if ! echo "$COMMITS_JSON" | grep -q '"sha"'; then
           echo "❌ Error: No commits found in Production repository!"
           echo ""
+          if echo "$COMMITS_JSON" | grep -q '"message"'; then
+            ERROR_MSG=$(echo "$COMMITS_JSON" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+            echo "❌ API Error: $ERROR_MSG"
+            echo ""
+          fi
           echo "💡 Solution:"
           echo "   1. Deploy to Production first (Action: deploy, Target: production)"
           echo "   2. Deploy again to create a second version"
@@ -252,24 +269,49 @@ jobs:
           exit 1
         fi
         
-        # Extract commit SHAs - get all SHA values into array
-        SHA_ARRAY=($(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | cut -d'"' -f4))
+        # Extract commit SHAs - try multiple methods
+        echo "🔍 Debug: Extracting SHA values..."
+        
+        # Method 1: Using grep with pattern matching (most common)
+        SHA_MATCHES=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | cut -d'"' -f4)
+        
+        # If Method 1 fails, try Method 2: More flexible pattern
+        if [ -z "$SHA_MATCHES" ] || [ $(echo "$SHA_MATCHES" | wc -l) -eq 0 ]; then
+          echo "⚠️  Method 1 failed, trying Method 2..."
+          SHA_MATCHES=$(echo "$COMMITS_JSON" | grep -o '"sha"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+        fi
+        
+        # If still fails, try Method 3: Using sed
+        if [ -z "$SHA_MATCHES" ] || [ $(echo "$SHA_MATCHES" | wc -l) -eq 0 ]; then
+          echo "⚠️  Method 2 failed, trying Method 3..."
+          SHA_MATCHES=$(echo "$COMMITS_JSON" | sed -n 's/.*"sha"\s*:\s*"\([^"]*\)".*/\1/p')
+        fi
+        
+        # Convert to array
+        SHA_ARRAY=()
+        while IFS= read -r line; do
+          if [ -n "$line" ] && [ ${#line} -ge 7 ]; then
+            SHA_ARRAY+=("$line")
+          fi
+        done <<< "$SHA_MATCHES"
         
         # Count commits
         COMMIT_COUNT=${#SHA_ARRAY[@]}
         
+        # Debug output
+        echo "🔍 Debug: Extracted $COMMIT_COUNT SHA(s)"
+        if [ $COMMIT_COUNT -gt 0 ]; then
+          echo "   First few SHAs:"
+          for i in "${!SHA_ARRAY[@]}"; do
+            if [ $i -lt 5 ]; then
+              echo "   [$i] ${SHA_ARRAY[$i]:0:7}"
+            fi
+          done
+        fi
+        
         # Get current (first) and previous (second) commit
         CURRENT_SHA="${SHA_ARRAY[0]}"
         PREVIOUS_SHA="${SHA_ARRAY[1]}"
-        
-        # Debug output
-        echo "🔍 Debug: Found $COMMIT_COUNT commit(s)"
-        if [ -n "$CURRENT_SHA" ]; then
-          echo "   Current SHA: ${CURRENT_SHA:0:7}"
-        fi
-        if [ -n "$PREVIOUS_SHA" ]; then
-          echo "   Previous SHA: ${PREVIOUS_SHA:0:7}"
-        fi
         
         if [ -z "$PREVIOUS_SHA" ] || [ "$COMMIT_COUNT" -lt 2 ]; then
           echo "❌ Error: No previous version found in Production repository!"
@@ -278,6 +320,16 @@ jobs:
           echo "   Found $COMMIT_COUNT commit(s) in Production repo"
           echo "   Need at least 2 commits to rollback"
           echo ""
+          if [ $COMMIT_COUNT -eq 0 ]; then
+            echo "🔍 Debug: SHA extraction failed. Checking raw JSON..."
+            echo "First 500 chars of response:"
+            echo "$COMMITS_JSON" | head -c 500
+            echo ""
+            echo ""
+            echo "Trying to find 'sha' in response:"
+            echo "$COMMITS_JSON" | grep -i sha | head -3
+            echo ""
+          fi
           echo "💡 Solution:"
           echo "   1. Deploy to Production again (Action: deploy, Target: production)"
           echo "   2. This will create a second commit in Production repo"
