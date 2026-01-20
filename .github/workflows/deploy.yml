@@ -383,32 +383,67 @@ jobs:
         path: production-checkout
         fetch-depth: 0
     
+    - name: Get Previous Commit from Git Log
+      id: get_previous_from_git
+      run: |
+        cd production-checkout
+        
+        echo "🔍 Getting commit list from git log..."
+        
+        # Get list of commits (skip first one, get second one)
+        COMMIT_LIST=$(git log --format="%H" -n 2)
+        
+        # Extract commits into array
+        COMMITS=()
+        while IFS= read -r line; do
+          [ -n "$line" ] && COMMITS+=("$line")
+        done <<< "$COMMIT_LIST"
+        
+        COMMIT_COUNT=${#COMMITS[@]}
+        
+        if [ $COMMIT_COUNT -lt 2 ]; then
+          echo "❌ Error: Not enough commits in Production repo"
+          echo "   Found $COMMIT_COUNT commit(s), need at least 2"
+          exit 1
+        fi
+        
+        # Current is first commit (index 0), previous is second commit (index 1)
+        CURRENT_SHA="${COMMITS[0]}"
+        PREVIOUS_SHA="${COMMITS[1]}"
+        
+        echo "✅ Current commit: ${CURRENT_SHA:0:7}"
+        echo "✅ Previous commit: ${PREVIOUS_SHA:0:7}"
+        
+        # Get commit message
+        PREVIOUS_MESSAGE=$(git log -1 --format="%s" "$PREVIOUS_SHA")
+        PREVIOUS_DATE=$(git log -1 --format="%ai" "$PREVIOUS_SHA")
+        PREVIOUS_AUTHOR=$(git log -1 --format="%an" "$PREVIOUS_SHA")
+        
+        echo ""
+        echo "📌 Rolling back to:"
+        echo "   SHA: ${PREVIOUS_SHA:0:7}"
+        echo "   Message: \"$PREVIOUS_MESSAGE\""
+        echo "   Author: $PREVIOUS_AUTHOR"
+        echo "   Date: $PREVIOUS_DATE"
+        echo ""
+        
+        echo "commit_sha=$PREVIOUS_SHA" >> $GITHUB_OUTPUT
+        echo "commit_message=$PREVIOUS_MESSAGE" >> $GITHUB_OUTPUT
+    
     - name: Checkout previous commit
       run: |
         cd production-checkout
-        PREVIOUS_SHA="${{ steps.get_previous_commit.outputs.commit_sha }}"
+        PREVIOUS_SHA="${{ steps.get_previous_from_git.outputs.commit_sha }}"
         
         echo "🔍 Checking out commit: ${PREVIOUS_SHA:0:7}"
         
-        # Fetch all commits to ensure we have the commit
-        git fetch origin gh-pages || git fetch origin || true
-        
-        # Verify commit exists
-        if ! git cat-file -e "$PREVIOUS_SHA" 2>/dev/null; then
-          echo "⚠️  Commit not found locally, fetching..."
-          git fetch origin gh-pages --depth=10 || git fetch origin --depth=10 || true
-        fi
-        
-        # Try to checkout the commit
+        # Checkout the previous commit
         if git checkout "$PREVIOUS_SHA" 2>/dev/null; then
           echo "✅ Successfully checked out commit ${PREVIOUS_SHA:0:7}"
         else
           echo "❌ Error: Cannot checkout previous commit $PREVIOUS_SHA"
           echo "🔍 Debug: Available commits:"
           git log --oneline -5 || true
-          echo ""
-          echo "🔍 Debug: Checking if commit exists:"
-          git cat-file -t "$PREVIOUS_SHA" 2>&1 || echo "Commit not found"
           exit 1
         fi
         
