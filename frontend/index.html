@@ -131,6 +131,8 @@
             text-transform: uppercase;
             text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
             position: relative;
+            word-wrap: break-word;
+            line-height: 1.2;
         }
 
         .title::before {
@@ -164,6 +166,7 @@
             letter-spacing: 8px;
             animation: pulse 2s ease-in-out infinite;
             margin-top: 10px;
+            word-wrap: break-word;
         }
 
         .version-badge {
@@ -305,6 +308,7 @@
             font-size: 0.6em;
             letter-spacing: 2px;
             animation: pulse 2s ease-in-out infinite;
+            white-space: nowrap;
         }
 
         .info-box::after {
@@ -318,6 +322,7 @@
             font-size: 0.6em;
             letter-spacing: 2px;
             animation: pulse 2s ease-in-out infinite;
+            white-space: nowrap;
         }
 
         .info-box p {
@@ -327,6 +332,7 @@
             line-height: 1.8;
             font-weight: 600;
             text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            word-wrap: break-word;
         }
 
         .info-box strong {
@@ -336,6 +342,7 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             font-family: 'Orbitron', monospace;
+            word-wrap: break-word;
         }
 
         .badge {
@@ -407,27 +414,206 @@
         .feature-item:nth-child(2) { animation-delay: 0.3s; }
         .feature-item:nth-child(3) { animation-delay: 0.6s; }
 
-        @media (max-width: 768px) {
+        /* Tablet */
+        @media (max-width: 1024px) {
             .title {
-                font-size: 2.5em;
-                letter-spacing: 3px;
+                font-size: 3.5em;
+                letter-spacing: 4px;
+            }
+
+            .subtitle {
+                font-size: 1.5em;
+                letter-spacing: 6px;
+            }
+
+            .header {
+                padding: 60px 20px 40px;
+            }
+
+            .gallery {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+            }
+
+            .info-box {
+                padding: 40px 30px;
+                margin: 40px auto;
+            }
+
+            .info-box p {
+                font-size: 1.2em;
+            }
+
+            .info-box strong {
+                font-size: 1.3em;
+            }
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .header {
+                padding: 40px 15px 30px;
+            }
+
+            .title {
+                font-size: 2.2em;
+                letter-spacing: 2px;
+                margin-bottom: 15px;
             }
 
             .title::before,
             .title::after {
                 display: none;
             }
-            
+
+            .subtitle {
+                font-size: 1.1em;
+                letter-spacing: 4px;
+                margin-top: 8px;
+            }
+
+            .version-badge {
+                font-size: 0.75em;
+                padding: 8px 15px;
+                margin-top: 15px;
+                letter-spacing: 2px;
+            }
+
+            .version-badge::before,
+            .version-badge::after {
+                display: none;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
             .gallery {
                 grid-template-columns: 1fr;
+                gap: 20px;
+                margin-top: 40px;
             }
-            
+
+            .image-card {
+                padding: 15px;
+            }
+
             .image-card img {
-                height: 220px;
+                height: 200px;
+            }
+
+            .image-card::after {
+                font-size: 0.7em;
+            }
+
+            .info-box {
+                padding: 30px 20px;
+                margin: 40px auto;
+            }
+
+            .info-box::before,
+            .info-box::after {
+                font-size: 0.5em;
+                white-space: normal;
+                width: 90%;
+                left: 5%;
+            }
+
+            .info-box p {
+                font-size: 1em;
+                margin: 15px 0;
+                line-height: 1.6;
+            }
+
+            .info-box strong {
+                font-size: 1.2em;
+                letter-spacing: 1px;
+            }
+
+            .badge {
+                font-size: 1em;
+                padding: 15px 25px;
+                margin-top: 20px;
+                letter-spacing: 2px;
+            }
+
+            .badge::before,
+            .badge::after {
+                display: none;
             }
 
             .features {
                 flex-direction: column;
+                gap: 15px;
+                margin-top: 20px;
+            }
+
+            .feature-item {
+                font-size: 0.95em;
+                padding: 15px 20px;
+                letter-spacing: 1px;
+            }
+
+            .feature-item::before {
+                left: 8px;
+            }
+        }
+
+        /* Small Mobile */
+        @media (max-width: 480px) {
+            .title {
+                font-size: 1.8em;
+                letter-spacing: 1px;
+            }
+
+            .subtitle {
+                font-size: 0.95em;
+                letter-spacing: 3px;
+            }
+
+            .version-badge {
+                font-size: 0.65em;
+                padding: 6px 12px;
+            }
+
+            .header {
+                padding: 30px 10px 20px;
+            }
+
+            .gallery {
+                margin-top: 30px;
+            }
+
+            .image-card img {
+                height: 180px;
+            }
+
+            .info-box {
+                padding: 25px 15px;
+                margin: 30px auto;
+            }
+
+            .info-box p {
+                font-size: 0.9em;
+                margin: 12px 0;
+            }
+
+            .info-box strong {
+                font-size: 1.1em;
+            }
+
+            .badge {
+                font-size: 0.9em;
+                padding: 12px 20px;
+            }
+
+            .feature-item {
+                font-size: 0.85em;
+                padding: 12px 18px;
             }
         }
     </style>
