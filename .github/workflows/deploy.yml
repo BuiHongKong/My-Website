@@ -43,26 +43,26 @@ jobs:
     - name: Verify HTML file exists
       run: |
         if [ ! -f "frontend/index.html" ]; then
-          echo "❌ Error: frontend/index.html not found"
+          echo "Error: frontend/index.html not found"
           exit 1
         fi
-        echo "✅ HTML file found: frontend/index.html"
+        echo "HTML file found: frontend/index.html"
     
     - name: Validate HTML
       run: |
-        echo "🔍 Validating HTML..."
+        echo "Validating HTML..."
         if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
-          echo "⚠️  Warning: Missing DOCTYPE declaration"
+          echo "Warning: Missing DOCTYPE declaration"
         fi
         if ! grep -q "<html" frontend/index.html; then
-          echo "❌ Error: Missing <html> tag"
+          echo "Error: Missing <html> tag"
           exit 1
         fi
         if ! grep -q "</html>" frontend/index.html; then
-          echo "❌ Error: Missing closing </html> tag"
+          echo "Error: Missing closing </html> tag"
           exit 1
         fi
-        echo "✅ HTML validation passed"
+        echo "HTML validation passed"
     
     - name: Setup Pages
       uses: actions/configure-pages@v4
@@ -77,8 +77,8 @@ jobs:
     
     - name: Display Staging URL
       run: |
-        echo "🌐 Staging deployed successfully!"
-        echo "🔗 URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        echo "Staging deployed successfully!"
+        echo "URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && github.event.inputs.target == 'production'
@@ -91,26 +91,26 @@ jobs:
     - name: Verify HTML file exists
       run: |
         if [ ! -f "frontend/index.html" ]; then
-          echo "❌ Error: frontend/index.html not found"
+          echo "Error: frontend/index.html not found"
           exit 1
         fi
-        echo "✅ HTML file found: frontend/index.html"
+        echo "HTML file found: frontend/index.html"
     
     - name: Validate HTML
       run: |
-        echo "🔍 Validating HTML..."
+        echo "Validating HTML..."
         if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
-          echo "⚠️  Warning: Missing DOCTYPE declaration"
+          echo "Warning: Missing DOCTYPE declaration"
         fi
         if ! grep -q "<html" frontend/index.html; then
-          echo "❌ Error: Missing <html> tag"
+          echo "Error: Missing <html> tag"
           exit 1
         fi
         if ! grep -q "</html>" frontend/index.html; then
-          echo "❌ Error: Missing closing </html> tag"
+          echo "Error: Missing closing </html> tag"
           exit 1
         fi
-        echo "✅ HTML validation passed"
+        echo "HTML validation passed"
     
     - name: Set Production Repo
       id: set_production_repo
@@ -121,35 +121,35 @@ jobs:
           PRODUCTION_REPO="${{ github.repository_owner }}/${{ github.event.repository.name }}-production"
         fi
         echo "repo=$PRODUCTION_REPO" >> $GITHUB_OUTPUT
-        echo "📦 Production repository: $PRODUCTION_REPO"
+        echo "Production repository: $PRODUCTION_REPO"
     
     - name: Check Production Token
       run: |
         if [ -z "${{ secrets.PRODUCTION_REPO_TOKEN }}" ]; then
-          echo "❌ Error: PRODUCTION_REPO_TOKEN secret is required!"
-          echo "⚠️  Please add PRODUCTION_REPO_TOKEN secret in:"
+          echo "Error: PRODUCTION_REPO_TOKEN secret is required!"
+          echo "Please add PRODUCTION_REPO_TOKEN secret in:"
           echo "   Settings → Secrets and variables → Actions → New repository secret"
           echo "   Name: PRODUCTION_REPO_TOKEN"
           echo "   Value: Your Personal Access Token with 'repo' permission"
           exit 1
         fi
-        echo "✅ Production token found"
+        echo "Production token found"
     
     - name: Verify Token and Repository Access
       run: |
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
         
-        echo "🔍 Verifying access to repository: $PRODUCTION_REPO"
+        echo "Verifying access to repository: $PRODUCTION_REPO"
         
         # Test if we can access the repo
         if curl -s -H "Authorization: token $TOKEN" \
            -H "Accept: application/vnd.github.v3+json" \
            "https://api.github.com/repos/$PRODUCTION_REPO" | grep -q '"name"'; then
-          echo "✅ Repository access verified"
+          echo "Repository access verified"
         else
-          echo "❌ Cannot access repository: $PRODUCTION_REPO"
-          echo "⚠️  Check:"
+          echo "Cannot access repository: $PRODUCTION_REPO"
+          echo "Check:"
           echo "   1. Repository exists: $PRODUCTION_REPO"
           echo "   2. Token has 'repo' permission"
           echo "   3. Token is not expired"
@@ -171,14 +171,14 @@ jobs:
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
         
-        echo "🔍 Verifying deployment..."
+        echo "Verifying deployment..."
         sleep 2
         
         # Check if gh-pages branch exists
         if curl -s -H "Authorization: token $TOKEN" \
            -H "Accept: application/vnd.github.v3+json" \
            "https://api.github.com/repos/$PRODUCTION_REPO/branches/gh-pages" | grep -q '"name"'; then
-          echo "✅ Branch gh-pages exists"
+          echo "Branch gh-pages exists"
           
           # Get latest commit
           COMMIT_SHA=$(curl -s -H "Authorization: token $TOKEN" \
@@ -187,12 +187,12 @@ jobs:
             grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4)
           
           if [ -n "$COMMIT_SHA" ]; then
-            echo "✅ Latest commit: $COMMIT_SHA"
+            echo "Latest commit: $COMMIT_SHA"
           else
-            echo "⚠️  Could not get commit SHA"
+            echo "Could not get commit SHA"
           fi
         else
-          echo "❌ Branch gh-pages not found - deployment may have failed"
+          echo "Branch gh-pages not found - deployment may have failed"
           exit 1
         fi
     
@@ -201,8 +201,8 @@ jobs:
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
         USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
-        echo "🚀 Production deployed successfully!"
-        echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
+        echo "Production deployed successfully!"
+        echo "URL: https://$USERNAME.github.io/$REPO_NAME/"
 
   rollback-production:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback' && github.event.inputs.target == 'production'
@@ -218,15 +218,15 @@ jobs:
           PRODUCTION_REPO="${{ github.repository_owner }}/${{ github.event.repository.name }}-production"
         fi
         echo "repo=$PRODUCTION_REPO" >> $GITHUB_OUTPUT
-        echo "📦 Production repository: $PRODUCTION_REPO"
+        echo "Production repository: $PRODUCTION_REPO"
     
     - name: Check Production Token
       run: |
         if [ -z "${{ secrets.PRODUCTION_REPO_TOKEN }}" ]; then
-          echo "❌ Error: PRODUCTION_REPO_TOKEN secret is required!"
+          echo "Error: PRODUCTION_REPO_TOKEN secret is required!"
           exit 1
         fi
-        echo "✅ Production token found"
+        echo "Production token found"
     
     - name: Get Previous Commit from Production
       id: get_previous_commit
@@ -234,9 +234,9 @@ jobs:
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
         
-        echo "📋 Getting previous deployment from Production repository..."
-        echo "🔍 Repository: $PRODUCTION_REPO"
-        echo "🔍 Branch: gh-pages"
+        echo "Getting previous deployment from Production repository..."
+        echo "Repository: $PRODUCTION_REPO"
+        echo "Branch: gh-pages"
         
         # Get commits from gh-pages branch (get 10 commits to be safe)
         COMMITS_JSON=$(curl -s -H "Authorization: token $TOKEN" \
@@ -244,25 +244,25 @@ jobs:
           "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=10")
         
         # Debug: Check API response
-        echo "🔍 Debug: API Response length: ${#COMMITS_JSON}"
+        echo "Debug: API Response length: ${#COMMITS_JSON}"
         if [ ${#COMMITS_JSON} -lt 10 ]; then
-          echo "⚠️  API response seems empty or too short"
+          echo "API response seems empty or too short"
           if echo "$COMMITS_JSON" | grep -q '"message"'; then
             ERROR_MSG=$(echo "$COMMITS_JSON" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
-            echo "❌ API Error: $ERROR_MSG"
+            echo "API Error: $ERROR_MSG"
           fi
         fi
         
         # Check if we got any commits - try multiple patterns
         if ! echo "$COMMITS_JSON" | grep -q '"sha"'; then
-          echo "❌ Error: No commits found in Production repository!"
+          echo "Error: No commits found in Production repository!"
           echo ""
           if echo "$COMMITS_JSON" | grep -q '"message"'; then
             ERROR_MSG=$(echo "$COMMITS_JSON" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
-            echo "❌ API Error: $ERROR_MSG"
+            echo "API Error: $ERROR_MSG"
             echo ""
           fi
-          echo "💡 Solution:"
+          echo "Solution:"
           echo "   1. Deploy to Production first (Action: deploy, Target: production)"
           echo "   2. Deploy again to create a second version"
           echo "   3. Then you can rollback to the previous version"
@@ -270,20 +270,20 @@ jobs:
         fi
         
         # Extract commit SHAs - try multiple methods
-        echo "🔍 Debug: Extracting SHA values..."
+        echo "Debug: Extracting SHA values..."
         
         # Method 1: Using grep with pattern matching (most common)
         SHA_MATCHES=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | cut -d'"' -f4)
         
         # If Method 1 fails, try Method 2: More flexible pattern
         if [ -z "$SHA_MATCHES" ] || [ $(echo "$SHA_MATCHES" | wc -l) -eq 0 ]; then
-          echo "⚠️  Method 1 failed, trying Method 2..."
+          echo "Method 1 failed, trying Method 2..."
           SHA_MATCHES=$(echo "$COMMITS_JSON" | grep -o '"sha"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         fi
         
         # If still fails, try Method 3: Using sed
         if [ -z "$SHA_MATCHES" ] || [ $(echo "$SHA_MATCHES" | wc -l) -eq 0 ]; then
-          echo "⚠️  Method 2 failed, trying Method 3..."
+          echo "Method 2 failed, trying Method 3..."
           SHA_MATCHES=$(echo "$COMMITS_JSON" | sed -n 's/.*"sha"\s*:\s*"\([^"]*\)".*/\1/p')
         fi
         
@@ -299,7 +299,7 @@ jobs:
         COMMIT_COUNT=${#SHA_ARRAY[@]}
         
         # Debug output
-        echo "🔍 Debug: Extracted $COMMIT_COUNT SHA(s)"
+        echo "Debug: Extracted $COMMIT_COUNT SHA(s)"
         if [ $COMMIT_COUNT -gt 0 ]; then
           echo "   First few SHAs:"
           for i in "${!SHA_ARRAY[@]}"; do
@@ -314,14 +314,14 @@ jobs:
         PREVIOUS_SHA="${SHA_ARRAY[1]}"
         
         if [ -z "$PREVIOUS_SHA" ] || [ "$COMMIT_COUNT" -lt 2 ]; then
-          echo "❌ Error: No previous version found in Production repository!"
+          echo "Error: No previous version found in Production repository!"
           echo ""
-          echo "📊 Current status:"
+          echo "Current status:"
           echo "   Found $COMMIT_COUNT commit(s) in Production repo"
           echo "   Need at least 2 commits to rollback"
           echo ""
           if [ $COMMIT_COUNT -eq 0 ]; then
-            echo "🔍 Debug: SHA extraction failed. Checking raw JSON..."
+            echo "Debug: SHA extraction failed. Checking raw JSON..."
             echo "First 500 chars of response:"
             echo "$COMMITS_JSON" | head -c 500
             echo ""
@@ -330,20 +330,20 @@ jobs:
             echo "$COMMITS_JSON" | grep -i sha | head -3
             echo ""
           fi
-          echo "💡 Solution:"
+          echo "Solution:"
           echo "   1. Deploy to Production again (Action: deploy, Target: production)"
           echo "   2. This will create a second commit in Production repo"
           echo "   3. Then you can rollback to the previous version"
           echo ""
-          echo "📝 Steps:"
+          echo "Steps:"
           echo "   Actions → Deploy to Environment → Run workflow"
           echo "   - Action: deploy"
           echo "   - Target: production"
           exit 1
         fi
         
-        echo "✅ Current version: ${CURRENT_SHA:0:7}"
-        echo "✅ Previous version: ${PREVIOUS_SHA:0:7}"
+        echo "Current version: ${CURRENT_SHA:0:7}"
+        echo "Previous version: ${PREVIOUS_SHA:0:7}"
         
         # Get commit info for previous version
         PREVIOUS_COMMIT_INFO=$(curl -s -H "Authorization: token $TOKEN" \
@@ -364,7 +364,7 @@ jobs:
         fi
         
         echo ""
-        echo "📌 Rolling back to:"
+        echo "Rolling back to:"
         echo "   SHA: ${PREVIOUS_SHA:0:7}"
         echo "   Message: \"$MESSAGE\""
         echo "   Author: $AUTHOR"
@@ -388,7 +388,7 @@ jobs:
       run: |
         cd production-checkout
         
-        echo "🔍 Getting commit list from git log..."
+        echo "Getting commit list from git log..."
         
         # Get list of commits (skip first one, get second one)
         COMMIT_LIST=$(git log --format="%H" -n 2)
@@ -402,7 +402,7 @@ jobs:
         COMMIT_COUNT=${#COMMITS[@]}
         
         if [ $COMMIT_COUNT -lt 2 ]; then
-          echo "❌ Error: Not enough commits in Production repo"
+          echo "Error: Not enough commits in Production repo"
           echo "   Found $COMMIT_COUNT commit(s), need at least 2"
           exit 1
         fi
@@ -411,8 +411,8 @@ jobs:
         CURRENT_SHA="${COMMITS[0]}"
         PREVIOUS_SHA="${COMMITS[1]}"
         
-        echo "✅ Current commit: ${CURRENT_SHA:0:7}"
-        echo "✅ Previous commit: ${PREVIOUS_SHA:0:7}"
+        echo "Current commit: ${CURRENT_SHA:0:7}"
+        echo "Previous commit: ${PREVIOUS_SHA:0:7}"
         
         # Get commit message
         PREVIOUS_MESSAGE=$(git log -1 --format="%s" "$PREVIOUS_SHA")
@@ -420,7 +420,7 @@ jobs:
         PREVIOUS_AUTHOR=$(git log -1 --format="%an" "$PREVIOUS_SHA")
         
         echo ""
-        echo "📌 Rolling back to:"
+        echo "Rolling back to:"
         echo "   SHA: ${PREVIOUS_SHA:0:7}"
         echo "   Message: \"$PREVIOUS_MESSAGE\""
         echo "   Author: $PREVIOUS_AUTHOR"
@@ -435,14 +435,14 @@ jobs:
         cd production-checkout
         PREVIOUS_SHA="${{ steps.get_previous_from_git.outputs.commit_sha }}"
         
-        echo "🔍 Checking out commit: ${PREVIOUS_SHA:0:7}"
+        echo "Checking out commit: ${PREVIOUS_SHA:0:7}"
         
         # Checkout the previous commit
         if git checkout "$PREVIOUS_SHA" 2>/dev/null; then
-          echo "✅ Successfully checked out commit ${PREVIOUS_SHA:0:7}"
+          echo "Successfully checked out commit ${PREVIOUS_SHA:0:7}"
         else
-          echo "❌ Error: Cannot checkout previous commit $PREVIOUS_SHA"
-          echo "🔍 Debug: Available commits:"
+          echo "Error: Cannot checkout previous commit $PREVIOUS_SHA"
+          echo "Debug: Available commits:"
           git log --oneline -5 || true
           exit 1
         fi
@@ -450,38 +450,38 @@ jobs:
         # Copy frontend folder to workspace root
         if [ -d "frontend" ]; then
           cp -r frontend ../frontend
-          echo "✅ Copied frontend folder"
+          echo "Copied frontend folder"
         else
-          echo "⚠️  Warning: frontend folder not found in Production repo"
+          echo "Warning: frontend folder not found in Production repo"
           # Try to copy all files if frontend doesn't exist
           cp -r . ../frontend 2>/dev/null || true
-          echo "✅ Copied all files"
+          echo "Copied all files"
         fi
         cd ..
     
     - name: Verify HTML file exists
       run: |
         if [ ! -f "frontend/index.html" ]; then
-          echo "❌ Error: frontend/index.html not found at commit ${{ github.event.inputs.commit_sha }}"
+          echo "Error: frontend/index.html not found at commit ${{ github.event.inputs.commit_sha }}"
           exit 1
         fi
-        echo "✅ HTML file found: frontend/index.html"
+        echo "HTML file found: frontend/index.html"
     
     - name: Validate HTML
       run: |
-        echo "🔍 Validating HTML..."
+        echo "Validating HTML..."
         if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
-          echo "⚠️  Warning: Missing DOCTYPE declaration"
+          echo "Warning: Missing DOCTYPE declaration"
         fi
         if ! grep -q "<html" frontend/index.html; then
-          echo "❌ Error: Missing <html> tag"
+          echo "Error: Missing <html> tag"
           exit 1
         fi
         if ! grep -q "</html>" frontend/index.html; then
-          echo "❌ Error: Missing closing </html> tag"
+          echo "Error: Missing closing </html> tag"
           exit 1
         fi
-        echo "✅ HTML validation passed"
+        echo "HTML validation passed"
     
     - name: Deploy to Production Repository (Rollback)
       uses: peaceiris/actions-gh-pages@v3
@@ -492,14 +492,14 @@ jobs:
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
         force_orphan: false
-        commit_message: "⏪ Rollback to previous version: ${{ steps.get_previous_commit.outputs.commit_sha }}"
+        commit_message: "Rollback to previous version: ${{ steps.get_previous_commit.outputs.commit_sha }}"
     
     - name: Display Rollback Info
       run: |
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
         USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
-        echo "⏪ Production rollback completed!"
-        echo "📌 Rolled back to: ${{ steps.get_previous_commit.outputs.commit_sha }}"
-        echo "📝 Message: ${{ steps.get_previous_commit.outputs.commit_message }}"
-        echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
+        echo "Production rollback completed!"
+        echo "Rolled back to: ${{ steps.get_previous_commit.outputs.commit_sha }}"
+        echo "Message: ${{ steps.get_previous_commit.outputs.commit_message }}"
+        echo "URL: https://$USERNAME.github.io/$REPO_NAME/"
