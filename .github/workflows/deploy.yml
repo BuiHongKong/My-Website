@@ -381,22 +381,46 @@ jobs:
         ref: gh-pages
         token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
         path: production-checkout
+        fetch-depth: 0
     
     - name: Checkout previous commit
       run: |
         cd production-checkout
         PREVIOUS_SHA="${{ steps.get_previous_commit.outputs.commit_sha }}"
-        git checkout "$PREVIOUS_SHA" || {
+        
+        echo "🔍 Checking out commit: ${PREVIOUS_SHA:0:7}"
+        
+        # Fetch all commits to ensure we have the commit
+        git fetch origin gh-pages || git fetch origin || true
+        
+        # Verify commit exists
+        if ! git cat-file -e "$PREVIOUS_SHA" 2>/dev/null; then
+          echo "⚠️  Commit not found locally, fetching..."
+          git fetch origin gh-pages --depth=10 || git fetch origin --depth=10 || true
+        fi
+        
+        # Try to checkout the commit
+        if git checkout "$PREVIOUS_SHA" 2>/dev/null; then
+          echo "✅ Successfully checked out commit ${PREVIOUS_SHA:0:7}"
+        else
           echo "❌ Error: Cannot checkout previous commit $PREVIOUS_SHA"
+          echo "🔍 Debug: Available commits:"
+          git log --oneline -5 || true
+          echo ""
+          echo "🔍 Debug: Checking if commit exists:"
+          git cat-file -t "$PREVIOUS_SHA" 2>&1 || echo "Commit not found"
           exit 1
-        }
+        fi
+        
         # Copy frontend folder to workspace root
         if [ -d "frontend" ]; then
           cp -r frontend ../frontend
+          echo "✅ Copied frontend folder"
         else
           echo "⚠️  Warning: frontend folder not found in Production repo"
           # Try to copy all files if frontend doesn't exist
           cp -r . ../frontend 2>/dev/null || true
+          echo "✅ Copied all files"
         fi
         cd ..
     
