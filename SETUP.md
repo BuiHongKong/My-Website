@@ -136,50 +136,46 @@ Staging OK → Vào Actions → Run workflow (manual)
 
 ## ⏪ Rollback Production
 
-Workflow hỗ trợ rollback cho Production environment.
+Workflow hỗ trợ rollback tự động về phiên bản trước đó trên Production.
 
-Có 2 cách rollback Production:
-
-#### Cách 1: Rollback từ Source Repo (mặc định)
+### Cách sử dụng:
 
 1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
 2. Click **"Run workflow"**
 3. Chọn:
    - **Action**: `rollback`
    - **Target**: `production`
-   - **Rollback source**: `source` (mặc định)
-   - **Commit SHA**: Nhập SHA của commit từ Source repo
 4. Click **"Run workflow"**
 
-**Lưu ý:** Commit SHA phải từ Source repository.
+### Cách hoạt động:
 
-#### Cách 2: Rollback từ Production Repo (mới)
+- Workflow tự động lấy commit thứ 2 (phiên bản trước đó) từ Production repository
+- Rollback về phiên bản đó mà **không cần nhập commit SHA**
+- Đơn giản, nhanh chóng, chỉ 1 click
 
-1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
-2. Click **"Run workflow"**
-3. Chọn:
-   - **Action**: `rollback`
-   - **Target**: `production`
-   - **Rollback source**: `production`
-   - **Commit SHA**: Để trống lần đầu, xem danh sách commits trong logs
-4. Click **"Run workflow"**
-5. Xem logs ở step **"List Production Commits"** để thấy danh sách commits đã deploy
-6. Copy commit SHA từ danh sách
-7. Chạy lại workflow với commit SHA đã copy
+### Lưu ý:
 
-**Lợi ích:** 
-- Không cần nhớ commit SHA từ Source repo
-- Xem được các version đã deploy lên Production
-- Rollback trực tiếp từ Production repo
+- Production repo phải có ít nhất 2 commits để rollback
+- Nếu chỉ có 1 commit, rollback sẽ fail với thông báo rõ ràng
+- Rollback sẽ lấy code từ Production repo (gh-pages branch), không phải Source repo
 
-**Ví dụ output:**
+### Ví dụ output:
+
 ```
-📋 Recent deployments on Production:
-  📌 abc1234 - "Deploy version 2.0"
-     👤 github-actions[bot] | 📅 2026-01-20 10:30
-  📌 def5678 - "Deploy version 1.0"
-     👤 github-actions[bot] | 📅 2026-01-18 15:20
-💡 Copy commit SHA above and paste into commit_sha input
+📋 Getting previous deployment from Production repository...
+✅ Current version: abc1234
+✅ Previous version: def5678
+
+📌 Rolling back to:
+   SHA: def5678
+   Message: "Deploy version 1.0"
+   Author: github-actions[bot]
+   Date: 2026-01-18 15:20
+
+⏪ Production rollback completed!
+📌 Rolled back to: def5678
+📝 Message: Deploy version 1.0
+🔗 URL: https://username.github.io/repo-production/
 ```
 
 ---

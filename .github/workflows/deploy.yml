@@ -21,18 +21,6 @@ on:
         options:
           - production
         default: 'production'
-      rollback_source:
-        description: 'Rollback from source repo or production repo? (for rollback only)'
-        required: false
-        type: choice
-        options:
-          - source
-          - production
-        default: 'source'
-      commit_sha:
-        description: 'Commit SHA to rollback to (required for rollback)'
-        required: false
-        type: string
       version:
         description: 'Version tag (optional, for deploy)'
         required: false
@@ -221,15 +209,6 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Validate Commit SHA
-      run: |
-        if [ -z "${{ github.event.inputs.commit_sha }}" ]; then
-          echo "❌ Error: commit_sha is required for rollback!"
-          echo "💡 Tip: Find commit SHA in repository commits history"
-          exit 1
-        fi
-        echo "✅ Rollback to commit: ${{ github.event.inputs.commit_sha }}"
-    
     - name: Set Production Repo
       id: set_production_repo
       run: |
@@ -249,56 +228,62 @@ jobs:
         fi
         echo "✅ Production token found"
     
-    - name: List Production Commits (if rollback from production)
-      if: github.event.inputs.rollback_source == 'production'
+    - name: Get Previous Commit from Production
+      id: get_previous_commit
       run: |
         PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
         TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
         
-        echo "📋 Fetching recent deployments from Production repository..."
-        echo ""
+        echo "📋 Getting previous deployment from Production repository..."
         
-        # Get commits from gh-pages branch
+        # Get commits from gh-pages branch (get 2 commits: current and previous)
         COMMITS_JSON=$(curl -s -H "Authorization: token $TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=10")
+          "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=2")
         
-        if echo "$COMMITS_JSON" | grep -q '"sha"'; then
-          echo "✅ Recent deployments on Production:"
-          echo ""
-          echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -10 | while read -r line; do
-            SHA=$(echo "$line" | cut -d'"' -f4)
-            COMMIT_INFO=$(curl -s -H "Authorization: token $TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/$PRODUCTION_REPO/commits/$SHA")
-            
-            MESSAGE=$(echo "$COMMIT_INFO" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/ /g')
-            DATE=$(echo "$COMMIT_INFO" | grep -o '"date":"[^"]*"' | head -1 | cut -d'"' -f4)
-            AUTHOR=$(echo "$COMMIT_INFO" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
-            
-            # Format date (handle both GNU and BSD date)
-            if date -d "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
-              FORMATTED_DATE=$(date -d "$DATE" "+%Y-%m-%d %H:%M")
-            elif date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
-              FORMATTED_DATE=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M")
-            else
-              FORMATTED_DATE="$DATE"
-            fi
-            
-            echo "  📌 ${SHA:0:7} - \"$MESSAGE\""
-            echo "     👤 $AUTHOR | 📅 $FORMATTED_DATE"
-            echo ""
-          done
-          
-          echo "💡 Copy commit SHA above and paste into commit_sha input"
-          echo "⚠️  Note: These are commits from Production repo (gh-pages branch)"
-        else
-          echo "⚠️  No commits found in Production repository"
-          echo "💡 You can rollback from Source repo instead (set rollback_source to 'source')"
+        # Extract commit SHAs
+        CURRENT_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4)
+        PREVIOUS_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -2 | tail -1 | cut -d'"' -f4)
+        
+        if [ -z "$PREVIOUS_SHA" ]; then
+          echo "❌ Error: No previous version found in Production repository!"
+          echo "⚠️  Production repo must have at least 2 commits to rollback"
+          exit 1
         fi
+        
+        echo "✅ Current version: ${CURRENT_SHA:0:7}"
+        echo "✅ Previous version: ${PREVIOUS_SHA:0:7}"
+        
+        # Get commit info for previous version
+        PREVIOUS_COMMIT_INFO=$(curl -s -H "Authorization: token $TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/$PRODUCTION_REPO/commits/$PREVIOUS_SHA")
+        
+        MESSAGE=$(echo "$PREVIOUS_COMMIT_INFO" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/ /g')
+        DATE=$(echo "$PREVIOUS_COMMIT_INFO" | grep -o '"date":"[^"]*"' | head -1 | cut -d'"' -f4)
+        AUTHOR=$(echo "$PREVIOUS_COMMIT_INFO" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+        
+        # Format date
+        if date -d "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
+          FORMATTED_DATE=$(date -d "$DATE" "+%Y-%m-%d %H:%M")
+        elif date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
+          FORMATTED_DATE=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M")
+        else
+          FORMATTED_DATE="$DATE"
+        fi
+        
+        echo ""
+        echo "📌 Rolling back to:"
+        echo "   SHA: ${PREVIOUS_SHA:0:7}"
+        echo "   Message: \"$MESSAGE\""
+        echo "   Author: $AUTHOR"
+        echo "   Date: $FORMATTED_DATE"
+        echo ""
+        
+        echo "commit_sha=$PREVIOUS_SHA" >> $GITHUB_OUTPUT
+        echo "commit_message=$MESSAGE" >> $GITHUB_OUTPUT
     
-    - name: Checkout from Production Repo (if rollback from production)
-      if: github.event.inputs.rollback_source == 'production'
+    - name: Checkout from Production Repo
       uses: actions/checkout@v4
       with:
         repository: ${{ steps.set_production_repo.outputs.repo }}
@@ -306,12 +291,12 @@ jobs:
         token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
         path: production-checkout
     
-    - name: Checkout specific commit from Production
-      if: github.event.inputs.rollback_source == 'production'
+    - name: Checkout previous commit
       run: |
         cd production-checkout
-        git checkout ${{ github.event.inputs.commit_sha }} || {
-          echo "❌ Error: Commit ${{ github.event.inputs.commit_sha }} not found in Production repo!"
+        PREVIOUS_SHA="${{ steps.get_previous_commit.outputs.commit_sha }}"
+        git checkout "$PREVIOUS_SHA" || {
+          echo "❌ Error: Cannot checkout previous commit $PREVIOUS_SHA"
           exit 1
         }
         # Copy frontend folder to workspace root
@@ -321,47 +306,6 @@ jobs:
           echo "⚠️  Warning: frontend folder not found in Production repo"
           # Try to copy all files if frontend doesn't exist
           cp -r . ../frontend 2>/dev/null || true
-        fi
-        cd ..
-    
-    - name: Checkout specific commit from Source
-      if: github.event.inputs.rollback_source == 'source' || github.event.inputs.rollback_source == ''
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.inputs.commit_sha }}
-        fetch-depth: 0
-    
-    - name: Verify commit exists (from Source)
-      if: github.event.inputs.rollback_source == 'source' || github.event.inputs.rollback_source == ''
-      run: |
-        COMMIT_SHA="${{ github.event.inputs.commit_sha }}"
-        if git rev-parse --verify "$COMMIT_SHA" > /dev/null 2>&1; then
-          echo "✅ Commit found in Source repo: $COMMIT_SHA"
-          echo "📝 Commit message:"
-          git log -1 --pretty=format:"%s" "$COMMIT_SHA"
-          echo ""
-          echo "👤 Author:"
-          git log -1 --pretty=format:"%an <%ae>" "$COMMIT_SHA"
-        else
-          echo "❌ Error: Commit $COMMIT_SHA not found in Source repo!"
-          exit 1
-        fi
-    
-    - name: Verify commit exists (from Production)
-      if: github.event.inputs.rollback_source == 'production'
-      run: |
-        COMMIT_SHA="${{ github.event.inputs.commit_sha }}"
-        cd production-checkout
-        if git rev-parse --verify "$COMMIT_SHA" > /dev/null 2>&1; then
-          echo "✅ Commit found in Production repo: $COMMIT_SHA"
-          echo "📝 Commit message:"
-          git log -1 --pretty=format:"%s" "$COMMIT_SHA"
-          echo ""
-          echo "👤 Author:"
-          git log -1 --pretty=format:"%an <%ae>" "$COMMIT_SHA"
-        else
-          echo "❌ Error: Commit $COMMIT_SHA not found in Production repo!"
-          exit 1
         fi
         cd ..
     
@@ -398,7 +342,7 @@ jobs:
         user_name: 'github-actions[bot]'
         user_email: 'github-actions[bot]@users.noreply.github.com'
         force_orphan: false
-        commit_message: "⏪ Rollback to commit ${{ github.event.inputs.commit_sha }}"
+        commit_message: "⏪ Rollback to previous version: ${{ steps.get_previous_commit.outputs.commit_sha }}"
     
     - name: Display Rollback Info
       run: |
@@ -406,5 +350,6 @@ jobs:
         REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
         USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
         echo "⏪ Production rollback completed!"
-        echo "📌 Rolled back to commit: ${{ github.event.inputs.commit_sha }}"
+        echo "📌 Rolled back to: ${{ steps.get_previous_commit.outputs.commit_sha }}"
+        echo "📝 Message: ${{ steps.get_previous_commit.outputs.commit_message }}"
         echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
