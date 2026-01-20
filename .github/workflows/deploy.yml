@@ -15,11 +15,10 @@ on:
           - deploy
           - rollback
       target:
-        description: 'Target environment (for deploy/rollback)'
+        description: 'Target environment (production only for manual deploy/rollback)'
         required: false
         type: choice
         options:
-          - staging
           - production
         default: 'production'
       rollback_source:
@@ -46,7 +45,7 @@ permissions:
 
 jobs:
   deploy-staging:
-    if: github.event_name != 'workflow_dispatch' || (github.event.inputs.action == 'deploy' && github.event.inputs.target == 'staging')
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     
     steps:
