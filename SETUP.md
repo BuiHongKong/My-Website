@@ -134,24 +134,9 @@ Staging OK → Vào Actions → Run workflow (manual)
 
 ---
 
-## ⏪ Rollback
+## ⏪ Rollback Production
 
-Workflow hỗ trợ rollback cho cả Staging và Production.
-
-### Rollback Staging:
-
-1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
-2. Click **"Run workflow"**
-3. Chọn:
-   - **Action**: `rollback`
-   - **Target**: `staging`
-   - **Commit SHA**: Nhập SHA của commit muốn rollback (ví dụ: `abc123def456`)
-4. Click **"Run workflow"**
-5. Workflow sẽ checkout commit đó từ Source repo và deploy lại lên Staging
-
-**Lưu ý:** Commit SHA phải từ Source repository.
-
-### Rollback Production:
+Workflow hỗ trợ rollback cho Production environment.
 
 Có 2 cách rollback Production:
 
@@ -265,7 +250,6 @@ Sau khi setup xong, bạn sẽ có 2 repositories:
 - [ ] Đã thêm secret `PRODUCTION_REPO` (optional, nếu repo tên khác)
 - [ ] Đã test staging deploy (push code)
 - [ ] Đã test production deploy (manual)
-- [ ] Đã test rollback staging
 - [ ] Đã test rollback production (từ source và production repo)
 
 ---
