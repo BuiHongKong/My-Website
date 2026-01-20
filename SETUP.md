@@ -134,6 +134,71 @@ Staging OK → Vào Actions → Run workflow (manual)
 
 ---
 
+## ⏪ Rollback
+
+Workflow hỗ trợ rollback cho cả Staging và Production.
+
+### Rollback Staging:
+
+1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
+2. Click **"Run workflow"**
+3. Chọn:
+   - **Action**: `rollback`
+   - **Target**: `staging`
+   - **Commit SHA**: Nhập SHA của commit muốn rollback (ví dụ: `abc123def456`)
+4. Click **"Run workflow"**
+5. Workflow sẽ checkout commit đó từ Source repo và deploy lại lên Staging
+
+**Lưu ý:** Commit SHA phải từ Source repository.
+
+### Rollback Production:
+
+Có 2 cách rollback Production:
+
+#### Cách 1: Rollback từ Source Repo (mặc định)
+
+1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
+2. Click **"Run workflow"**
+3. Chọn:
+   - **Action**: `rollback`
+   - **Target**: `production`
+   - **Rollback source**: `source` (mặc định)
+   - **Commit SHA**: Nhập SHA của commit từ Source repo
+4. Click **"Run workflow"**
+
+**Lưu ý:** Commit SHA phải từ Source repository.
+
+#### Cách 2: Rollback từ Production Repo (mới)
+
+1. Vào **Actions** → Chọn workflow **"Deploy to Environment"**
+2. Click **"Run workflow"**
+3. Chọn:
+   - **Action**: `rollback`
+   - **Target**: `production`
+   - **Rollback source**: `production`
+   - **Commit SHA**: Để trống lần đầu, xem danh sách commits trong logs
+4. Click **"Run workflow"**
+5. Xem logs ở step **"List Production Commits"** để thấy danh sách commits đã deploy
+6. Copy commit SHA từ danh sách
+7. Chạy lại workflow với commit SHA đã copy
+
+**Lợi ích:** 
+- Không cần nhớ commit SHA từ Source repo
+- Xem được các version đã deploy lên Production
+- Rollback trực tiếp từ Production repo
+
+**Ví dụ output:**
+```
+📋 Recent deployments on Production:
+  📌 abc1234 - "Deploy version 2.0"
+     👤 github-actions[bot] | 📅 2026-01-20 10:30
+  📌 def5678 - "Deploy version 1.0"
+     👤 github-actions[bot] | 📅 2026-01-18 15:20
+💡 Copy commit SHA above and paste into commit_sha input
+```
+
+---
+
 ## 📊 URLs
 
 Sau khi setup xong, bạn sẽ có 2 repositories:
@@ -200,6 +265,8 @@ Sau khi setup xong, bạn sẽ có 2 repositories:
 - [ ] Đã thêm secret `PRODUCTION_REPO` (optional, nếu repo tên khác)
 - [ ] Đã test staging deploy (push code)
 - [ ] Đã test production deploy (manual)
+- [ ] Đã test rollback staging
+- [ ] Đã test rollback production (từ source và production repo)
 
 ---
 
@@ -210,6 +277,9 @@ Sau khi setup xong:
 - ✅ 2 URLs riêng (staging + production)
 - ✅ Staging auto deploy vào repo hiện tại
 - ✅ Production manual deploy vào repo-production
+- ✅ Rollback cho cả Staging và Production
+- ✅ Rollback Production từ Source repo hoặc Production repo
+- ✅ List commits từ Production repo để dễ chọn version rollback
 - ✅ Đơn giản, dễ quản lý
 
 **Chúc bạn setup thành công! 🎉**

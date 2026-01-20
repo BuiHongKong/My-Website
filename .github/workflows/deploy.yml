@@ -7,8 +7,35 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
+      target:
+        description: 'Target environment (for deploy/rollback)'
+        required: false
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'production'
+      rollback_source:
+        description: 'Rollback from source repo or production repo? (for rollback only)'
+        required: false
+        type: choice
+        options:
+          - source
+          - production
+        default: 'source'
+      commit_sha:
+        description: 'Commit SHA to rollback to (required for rollback)'
+        required: false
+        type: string
       version:
-        description: 'Version tag (optional)'
+        description: 'Version tag (optional, for deploy)'
         required: false
         type: string
 
@@ -19,7 +46,7 @@ permissions:
 
 jobs:
   deploy-staging:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' || (github.event.inputs.action == 'deploy' && github.event.inputs.target == 'staging')
     runs-on: ubuntu-latest
     
     steps:
@@ -67,7 +94,7 @@ jobs:
         echo "🔗 URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
 
   deploy-production:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && github.event.inputs.target == 'production'
     runs-on: ubuntu-latest
     
     steps:
@@ -188,4 +215,272 @@ jobs:
         REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
         USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
         echo "🚀 Production deployed successfully!"
+        echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
+
+  rollback-staging:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback' && github.event.inputs.target == 'staging'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Validate Commit SHA
+      run: |
+        if [ -z "${{ github.event.inputs.commit_sha }}" ]; then
+          echo "❌ Error: commit_sha is required for rollback!"
+          echo "💡 Tip: You can find commit SHA in:"
+          echo "   - Repository → Commits → Copy SHA"
+          echo "   - Or use git log to see commit history"
+          exit 1
+        fi
+        echo "✅ Rollback to commit: ${{ github.event.inputs.commit_sha }}"
+    
+    - name: Checkout specific commit
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.commit_sha }}
+        fetch-depth: 0
+    
+    - name: Verify commit exists
+      run: |
+        COMMIT_SHA="${{ github.event.inputs.commit_sha }}"
+        if git rev-parse --verify "$COMMIT_SHA" > /dev/null 2>&1; then
+          echo "✅ Commit found: $COMMIT_SHA"
+          echo "📝 Commit details:"
+          git log -1 --oneline "$COMMIT_SHA"
+        else
+          echo "❌ Error: Commit $COMMIT_SHA not found!"
+          exit 1
+        fi
+    
+    - name: Verify HTML file exists
+      run: |
+        if [ ! -f "frontend/index.html" ]; then
+          echo "❌ Error: frontend/index.html not found at commit ${{ github.event.inputs.commit_sha }}"
+          exit 1
+        fi
+        echo "✅ HTML file found: frontend/index.html"
+    
+    - name: Validate HTML
+      run: |
+        echo "🔍 Validating HTML..."
+        if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
+          echo "⚠️  Warning: Missing DOCTYPE declaration"
+        fi
+        if ! grep -q "<html" frontend/index.html; then
+          echo "❌ Error: Missing <html> tag"
+          exit 1
+        fi
+        if ! grep -q "</html>" frontend/index.html; then
+          echo "❌ Error: Missing closing </html> tag"
+          exit 1
+        fi
+        echo "✅ HTML validation passed"
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './frontend'
+    
+    - name: Deploy to GitHub Pages (Rollback)
+      uses: actions/deploy-pages@v4
+    
+    - name: Display Rollback Info
+      run: |
+        echo "⏪ Staging rollback completed!"
+        echo "📌 Rolled back to commit: ${{ github.event.inputs.commit_sha }}"
+        echo "🔗 URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+
+  rollback-production:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback' && github.event.inputs.target == 'production'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Validate Commit SHA
+      run: |
+        if [ -z "${{ github.event.inputs.commit_sha }}" ]; then
+          echo "❌ Error: commit_sha is required for rollback!"
+          echo "💡 Tip: Find commit SHA in repository commits history"
+          exit 1
+        fi
+        echo "✅ Rollback to commit: ${{ github.event.inputs.commit_sha }}"
+    
+    - name: Set Production Repo
+      id: set_production_repo
+      run: |
+        if [ -n "${{ secrets.PRODUCTION_REPO }}" ]; then
+          PRODUCTION_REPO="${{ secrets.PRODUCTION_REPO }}"
+        else
+          PRODUCTION_REPO="${{ github.repository_owner }}/${{ github.event.repository.name }}-production"
+        fi
+        echo "repo=$PRODUCTION_REPO" >> $GITHUB_OUTPUT
+        echo "📦 Production repository: $PRODUCTION_REPO"
+    
+    - name: Check Production Token
+      run: |
+        if [ -z "${{ secrets.PRODUCTION_REPO_TOKEN }}" ]; then
+          echo "❌ Error: PRODUCTION_REPO_TOKEN secret is required!"
+          exit 1
+        fi
+        echo "✅ Production token found"
+    
+    - name: List Production Commits (if rollback from production)
+      if: github.event.inputs.rollback_source == 'production'
+      run: |
+        PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
+        TOKEN="${{ secrets.PRODUCTION_REPO_TOKEN }}"
+        
+        echo "📋 Fetching recent deployments from Production repository..."
+        echo ""
+        
+        # Get commits from gh-pages branch
+        COMMITS_JSON=$(curl -s -H "Authorization: token $TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=10")
+        
+        if echo "$COMMITS_JSON" | grep -q '"sha"'; then
+          echo "✅ Recent deployments on Production:"
+          echo ""
+          echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -10 | while read -r line; do
+            SHA=$(echo "$line" | cut -d'"' -f4)
+            COMMIT_INFO=$(curl -s -H "Authorization: token $TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$PRODUCTION_REPO/commits/$SHA")
+            
+            MESSAGE=$(echo "$COMMIT_INFO" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/ /g')
+            DATE=$(echo "$COMMIT_INFO" | grep -o '"date":"[^"]*"' | head -1 | cut -d'"' -f4)
+            AUTHOR=$(echo "$COMMIT_INFO" | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+            
+            # Format date (handle both GNU and BSD date)
+            if date -d "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
+              FORMATTED_DATE=$(date -d "$DATE" "+%Y-%m-%d %H:%M")
+            elif date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M" > /dev/null 2>&1; then
+              FORMATTED_DATE=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$DATE" "+%Y-%m-%d %H:%M")
+            else
+              FORMATTED_DATE="$DATE"
+            fi
+            
+            echo "  📌 ${SHA:0:7} - \"$MESSAGE\""
+            echo "     👤 $AUTHOR | 📅 $FORMATTED_DATE"
+            echo ""
+          done
+          
+          echo "💡 Copy commit SHA above and paste into commit_sha input"
+          echo "⚠️  Note: These are commits from Production repo (gh-pages branch)"
+        else
+          echo "⚠️  No commits found in Production repository"
+          echo "💡 You can rollback from Source repo instead (set rollback_source to 'source')"
+        fi
+    
+    - name: Checkout from Production Repo (if rollback from production)
+      if: github.event.inputs.rollback_source == 'production'
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ steps.set_production_repo.outputs.repo }}
+        ref: gh-pages
+        token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
+        path: production-checkout
+    
+    - name: Checkout specific commit from Production
+      if: github.event.inputs.rollback_source == 'production'
+      run: |
+        cd production-checkout
+        git checkout ${{ github.event.inputs.commit_sha }} || {
+          echo "❌ Error: Commit ${{ github.event.inputs.commit_sha }} not found in Production repo!"
+          exit 1
+        }
+        # Copy frontend folder to workspace root
+        if [ -d "frontend" ]; then
+          cp -r frontend ../frontend
+        else
+          echo "⚠️  Warning: frontend folder not found in Production repo"
+          # Try to copy all files if frontend doesn't exist
+          cp -r . ../frontend 2>/dev/null || true
+        fi
+        cd ..
+    
+    - name: Checkout specific commit from Source
+      if: github.event.inputs.rollback_source == 'source' || github.event.inputs.rollback_source == ''
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.commit_sha }}
+        fetch-depth: 0
+    
+    - name: Verify commit exists (from Source)
+      if: github.event.inputs.rollback_source == 'source' || github.event.inputs.rollback_source == ''
+      run: |
+        COMMIT_SHA="${{ github.event.inputs.commit_sha }}"
+        if git rev-parse --verify "$COMMIT_SHA" > /dev/null 2>&1; then
+          echo "✅ Commit found in Source repo: $COMMIT_SHA"
+          echo "📝 Commit message:"
+          git log -1 --pretty=format:"%s" "$COMMIT_SHA"
+          echo ""
+          echo "👤 Author:"
+          git log -1 --pretty=format:"%an <%ae>" "$COMMIT_SHA"
+        else
+          echo "❌ Error: Commit $COMMIT_SHA not found in Source repo!"
+          exit 1
+        fi
+    
+    - name: Verify commit exists (from Production)
+      if: github.event.inputs.rollback_source == 'production'
+      run: |
+        COMMIT_SHA="${{ github.event.inputs.commit_sha }}"
+        cd production-checkout
+        if git rev-parse --verify "$COMMIT_SHA" > /dev/null 2>&1; then
+          echo "✅ Commit found in Production repo: $COMMIT_SHA"
+          echo "📝 Commit message:"
+          git log -1 --pretty=format:"%s" "$COMMIT_SHA"
+          echo ""
+          echo "👤 Author:"
+          git log -1 --pretty=format:"%an <%ae>" "$COMMIT_SHA"
+        else
+          echo "❌ Error: Commit $COMMIT_SHA not found in Production repo!"
+          exit 1
+        fi
+        cd ..
+    
+    - name: Verify HTML file exists
+      run: |
+        if [ ! -f "frontend/index.html" ]; then
+          echo "❌ Error: frontend/index.html not found at commit ${{ github.event.inputs.commit_sha }}"
+          exit 1
+        fi
+        echo "✅ HTML file found: frontend/index.html"
+    
+    - name: Validate HTML
+      run: |
+        echo "🔍 Validating HTML..."
+        if ! grep -q "<!DOCTYPE html>" frontend/index.html; then
+          echo "⚠️  Warning: Missing DOCTYPE declaration"
+        fi
+        if ! grep -q "<html" frontend/index.html; then
+          echo "❌ Error: Missing <html> tag"
+          exit 1
+        fi
+        if ! grep -q "</html>" frontend/index.html; then
+          echo "❌ Error: Missing closing </html> tag"
+          exit 1
+        fi
+        echo "✅ HTML validation passed"
+    
+    - name: Deploy to Production Repository (Rollback)
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        personal_token: ${{ secrets.PRODUCTION_REPO_TOKEN }}
+        publish_dir: ./frontend
+        external_repository: ${{ steps.set_production_repo.outputs.repo }}
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        force_orphan: false
+        commit_message: "⏪ Rollback to commit ${{ github.event.inputs.commit_sha }}"
+    
+    - name: Display Rollback Info
+      run: |
+        PRODUCTION_REPO="${{ steps.set_production_repo.outputs.repo }}"
+        REPO_NAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f2)
+        USERNAME=$(echo "$PRODUCTION_REPO" | cut -d'/' -f1)
+        echo "⏪ Production rollback completed!"
+        echo "📌 Rolled back to commit: ${{ github.event.inputs.commit_sha }}"
         echo "🔗 URL: https://$USERNAME.github.io/$REPO_NAME/"
