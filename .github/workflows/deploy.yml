@@ -241,13 +241,40 @@ jobs:
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/repos/$PRODUCTION_REPO/commits?sha=gh-pages&per_page=2")
         
+        # Check if we got any commits
+        if ! echo "$COMMITS_JSON" | grep -q '"sha"'; then
+          echo "❌ Error: No commits found in Production repository!"
+          echo ""
+          echo "💡 Solution:"
+          echo "   1. Deploy to Production first (Action: deploy, Target: production)"
+          echo "   2. Deploy again to create a second version"
+          echo "   3. Then you can rollback to the previous version"
+          exit 1
+        fi
+        
         # Extract commit SHAs
         CURRENT_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4)
         PREVIOUS_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -2 | tail -1 | cut -d'"' -f4)
         
-        if [ -z "$PREVIOUS_SHA" ]; then
+        # Count commits
+        COMMIT_COUNT=$(echo "$COMMITS_JSON" | grep -o '"sha"' | wc -l | tr -d ' ')
+        
+        if [ -z "$PREVIOUS_SHA" ] || [ "$COMMIT_COUNT" -lt 2 ]; then
           echo "❌ Error: No previous version found in Production repository!"
-          echo "⚠️  Production repo must have at least 2 commits to rollback"
+          echo ""
+          echo "📊 Current status:"
+          echo "   Found $COMMIT_COUNT commit(s) in Production repo"
+          echo "   Need at least 2 commits to rollback"
+          echo ""
+          echo "💡 Solution:"
+          echo "   1. Deploy to Production again (Action: deploy, Target: production)"
+          echo "   2. This will create a second commit in Production repo"
+          echo "   3. Then you can rollback to the previous version"
+          echo ""
+          echo "📝 Steps:"
+          echo "   Actions → Deploy to Environment → Run workflow"
+          echo "   - Action: deploy"
+          echo "   - Target: production"
           exit 1
         fi
         
