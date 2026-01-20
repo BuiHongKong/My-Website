@@ -252,12 +252,24 @@ jobs:
           exit 1
         fi
         
-        # Extract commit SHAs
-        CURRENT_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -1 | cut -d'"' -f4)
-        PREVIOUS_SHA=$(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | head -2 | tail -1 | cut -d'"' -f4)
+        # Extract commit SHAs - get all SHA values into array
+        SHA_ARRAY=($(echo "$COMMITS_JSON" | grep -o '"sha":"[^"]*"' | cut -d'"' -f4))
         
         # Count commits
-        COMMIT_COUNT=$(echo "$COMMITS_JSON" | grep -o '"sha"' | wc -l | tr -d ' ')
+        COMMIT_COUNT=${#SHA_ARRAY[@]}
+        
+        # Get current (first) and previous (second) commit
+        CURRENT_SHA="${SHA_ARRAY[0]}"
+        PREVIOUS_SHA="${SHA_ARRAY[1]}"
+        
+        # Debug output
+        echo "🔍 Debug: Found $COMMIT_COUNT commit(s)"
+        if [ -n "$CURRENT_SHA" ]; then
+          echo "   Current SHA: ${CURRENT_SHA:0:7}"
+        fi
+        if [ -n "$PREVIOUS_SHA" ]; then
+          echo "   Previous SHA: ${PREVIOUS_SHA:0:7}"
+        fi
         
         if [ -z "$PREVIOUS_SHA" ] || [ "$COMMIT_COUNT" -lt 2 ]; then
           echo "❌ Error: No previous version found in Production repository!"
